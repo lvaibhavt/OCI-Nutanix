@@ -50,8 +50,9 @@ elif [ "$INSTALL_MODE" = unattended ]; then
   info "host $HOST_IP, CVM $CVM_IP, mask $NETMASK, gateway $GATEWAY; no reboot at the end"
   scp_to_installer "$REMOTE_DIR/ce-unattended.py"
   # runs detached on the installer: an SSH drop during the ~15 min must not kill imaging
-  # ([u]: the pattern must not match this remote shell's own command line)
-  ssh_installer "pgrep -f 'python3 /root/ce-[u]nattended' >/dev/null || { rm -f /root/ce-unattended.log; cd /root/phoenix && \
+  # -x: exact command line; a plain -f would also match this remote shell,
+  # whose own command line contains "python3 /root/ce-unattended.py"
+  ssh_installer "pgrep -fx 'python3 /root/ce-unattended.py' >/dev/null || { rm -f /root/ce-unattended.log; cd /root/phoenix && \
     CE_HOST_IP=$HOST_IP CE_CVM_IP=$CVM_IP CE_NETMASK=$NETMASK CE_GATEWAY=$GATEWAY CE_ACCEPT_EULA=yes \
     nohup sh -c 'python3 /root/ce-unattended.py; echo EXIT=\$?' > /root/ce-unattended.log 2>&1 < /dev/null & }"
   info "log on the installer: /root/ce-unattended.log (and /tmp/phoenix.log); about 15 min"
