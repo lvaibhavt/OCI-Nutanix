@@ -6,7 +6,8 @@
 #   --from N   start at step N (after fixing a failed step)
 #   --to N     stop after step N
 # Every step is idempotent, so re-running the whole thing after a failure is
-# also fine. Step 05 is interactive (the Nutanix installer UI).
+# also fine. With INSTALL_MODE=unattended (default) and CE_ACCEPT_EULA=yes no
+# input is needed at all; INSTALL_MODE=interactive opens the installer UI in 05.
 # Total time: roughly 2-3 hours, most of it waiting for OCI and the installer.
 # =============================================================================
 set -euo pipefail

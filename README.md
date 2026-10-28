@@ -2,7 +2,7 @@
 
 Scripts and a step-by-step runbook to install and run **Nutanix Community Edition (AHV + CVM, single-node cluster)** on an **Oracle Cloud Infrastructure bare-metal instance**, booting AHV directly from the OCI iSCSI boot volume.
 
-Everything that can be scripted is scripted. From the stock CE ISO in an Object Storage bucket to a running cluster there is exactly **one interactive step** (the Nutanix installer's text UI, which has no unattended mode); the scripts print the values to type.
+Everything is scripted. From the stock CE ISO in an Object Storage bucket to a running cluster **no input is needed**: step 05 runs Nutanix's own installer with its text UI replaced by the values from the config (`scripts/remote/ce-unattended.py`, `INSTALL_MODE=unattended`, the default). Unattended mode accepts the Nutanix CE EULA on your behalf, so you must read it and set `CE_ACCEPT_EULA=yes`. `INSTALL_MODE=interactive` keeps the original text UI.
 
 | | |
 |---|---|
@@ -20,11 +20,11 @@ Based on the reference implementation *Running Nutanix AHV (Community Edition) o
 On the Oracle Linux 10 admin host, as root:
 
 ```bash
-git clone https://github.com/AnykeyNL/OCI-Nutanix.git
+git clone https://github.com/lvaibhavt/OCI-Nutanix.git
 cd OCI-Nutanix
 cp config/oci-nutanix.env.example config/oci-nutanix.env
-vi config/oci-nutanix.env          # COMPARTMENT_ID, SUBNET_ID, SRC_BUCKET (+ SRC_ISO_OBJECT if the name differs)
-scripts/install-all.sh             # runs steps 00-07; step 05 opens the Nutanix installer
+vi config/oci-nutanix.env          # COMPARTMENT_ID, SUBNET_ID, SRC_BUCKET (+ SRC_ISO_OBJECT), CE_ACCEPT_EULA=yes
+scripts/install-all.sh             # runs steps 00-07 hands-off
 ```
 
 About 2–3 hours end to end, most of it waiting (ISO build ~15 min, image import 10–30 min, bare-metal launch 10–15 min, installer ~15 min, first AHV boot 15–20 min). Each step can also be run on its own and is safe to re-run; `install-all.sh --from N` resumes after a fix.

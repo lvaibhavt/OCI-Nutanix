@@ -54,6 +54,9 @@ load_config() {
   CE_PASSWORD=${CE_PASSWORD:-nutanix/4u}
   OCI_SERVICES_IP=${OCI_SERVICES_IP:-169.254.169.254}
   CONSOLE_SSH_PUBKEY_FILE=${CONSOLE_SSH_PUBKEY_FILE:-}
+  INSTALL_MODE=${INSTALL_MODE:-unattended}
+  CE_ACCEPT_EULA=${CE_ACCEPT_EULA:-no}
+  case $INSTALL_MODE in unattended|interactive) ;; *) die "INSTALL_MODE must be unattended or interactive" ;; esac
   [ -n "${OCI_CLI_REGION:-}" ] && export OCI_CLI_REGION
   mkdir -p "$STATE_DIR"
   mkdir -p "$WORK_DIR" 2>/dev/null || true
