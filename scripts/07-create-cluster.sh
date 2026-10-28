@@ -65,7 +65,7 @@ wait_for "CVM ping" 1800 20 ping -c1 -W2 "$CVM_IP"
 firstboot_done() {
   local st
   st=$(ssh_pw "nutanix@$CVM_IP" 'systemctl show -p ActiveState --value nutanix-rc-local') || return 1
-  [ -n "$st" ] && [ "$st" != activating ] || { echo "nutanix-rc-local: ${st:-unknown}"; return 1; }
+  [ -n "$st" ] && [ "$st" != activating ] || { echo "nutanix-rc-local: ${st:-unknown}" >&2; return 1; }
 }
 wait_for "CVM first boot (nutanix-rc-local)" 3600 30 firstboot_done
 genesis_up() { ssh_cvm 'genesis status' | grep -q 'genesis:'; }
