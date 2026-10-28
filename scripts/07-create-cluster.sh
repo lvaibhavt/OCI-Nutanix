@@ -14,6 +14,10 @@ set -euo pipefail
 load_config
 need_cmd sshpass ssh scp ping
 load_node
+# one run at a time: two concurrent "cluster create" on one CVM fail with
+# "SVM ... is already configured" (or worse, leave a half-built cluster)
+exec 9>"$STATE_DIR/$NODE_NAME.07.lock"
+flock -n 9 || die "another 07-create-cluster.sh is already running for $NODE_NAME (tmux ls; ps -ef | grep 07-create)"
 
 say "1/5 Waiting for AHV on $HOST_IP"
 # AHV also answers on the boot NIC (IBFT_IP, routing table 100). If only that
