@@ -75,9 +75,11 @@ It writes `state/<node>.env` with `INSTANCE_ID`, `IBFT_IP` (primary VNIC, iSCSI 
 1. Waits for SSH on `IBFT_IP`. The bare-metal ISO's wrapper logs in to the boot volume from the iBFT, starts the CE installer and enables SSH; no console interaction.
 2. Stops the auto-started installer UI (`screen -S centos_phoenix -X quit`), otherwise an SSH login attaches to it.
 3. Copies `scripts/remote/*` and `state/<node>.iscsi`, runs `ce-bm-prep.sh` on the installer. Expected: both volumes logged in; `sda 100G`, `sdb 400G`, `sdc 600G`, all `TRAN=iscsi`; `patches applied: 5`; `PCI-ID patch: 1`; `driver-list patch: 1`; `sda mounts: 0`; `HYP=` and `NOS=` found. (What the patches do: [ARCHITECTURE.md](ARCHITECTURE.md#installer-adaptations-in-ram).)
-4. Prints the values to enter and opens `./phoenix` over `ssh -t`. **This is the only interactive step.**
+4. Runs the Nutanix installer.
 
-In the installer:
+**`INSTALL_MODE=unattended` (default, needs `CE_ACCEPT_EULA=yes`).** `scripts/remote/ce-unattended.py` runs Nutanix's own `./phoenix` in the background on the installer (`nohup`, so an SSH drop does not stop it). Only the CE text screen is replaced: the fields it would set come from the config and `state/<node>.env` (H = `sda`, C = the smaller block volume, D = the rest; host IP, CVM IP, mask, gateway; EULA accepted). Phoenix's own `REBOOT=false` keeps the server from rebooting, and the final "reboot now?" is answered `N`. Hardware detection, validation and imaging are stock. Log: `/root/ce-unattended.log` on the installer (`scripts/ops/ssh.sh installer 'tail -f /root/ce-unattended.log'`). It begins with three `ce-unattended:` lines (AOS version, disks, IPs) and ends with `Imaging process completed successfully!`, `N   (ce-unattended)` and `EXIT=0`. About 15 minutes. The step then checks the `ahv` volume group on `sda` and continues by itself.
+
+**`INSTALL_MODE=interactive`.** The script prints the values and opens `./phoenix` over `ssh -t`:
 
 | Field | Value |
 |---|---|
@@ -89,6 +91,8 @@ In the installer:
 | Create single-node cluster | leave off — step 07 creates it |
 
 Scroll to the end of the EULA, accept, start. About 15 minutes; ends with `Imaging process completed successfully!`. **Answer `N` to the reboot question.** The script then checks that the `ahv` volume group exists on `sda` and asks you to confirm.
+
+The traceback on the server console (`EOFError: Compressed file ended before the end-of-stream marker`) comes from the installer screen that started automatically at boot: `ce-bm-prep.sh` moves the ISO into RAM while that screen reads it. Harmless; step 05 stops that screen anyway.
 
 If the installer fails, fix the cause and re-run `scripts/05-install.sh`; the prep is re-applied (idempotent) and the installer re-opened. If the server was rebooted meanwhile, the in-RAM prep is gone and is simply applied again.
 
@@ -118,9 +122,11 @@ Nothing is needed on the host: during the first boot AHV logs in the two volumes
 
 1. waits for SSH on `HOST_IP` (15–20 minutes after the reboot);
 2. runs `validate-ahv-bm.sh` (30 checks). Until the cluster exists, *time synchronised* and the CVM/cluster checks may fail; anything else failing → `scripts/ops/reapply-host-setup.sh`, then re-run;
-3. waits for the CVM to ping and for `genesis status`;
+3. waits for the CVM to ping, then for the CVM's first boot to finish (`nutanix-rc-local` no longer `activating`, 5–15 min), then for `genesis status`. The order matters: `genesis status` and the CVM's first boot (`config_home_dir`) take the same lock, `/tmp/upgrade_genesis_venv.lock`. Asked too early, `genesis status` takes it and hangs, and first boot waits on it forever, so genesis never starts. Every check inside a wait gives up after 60 s and is retried;
 4. `cluster -s <CVM_IP> --redundancy_factor=1 create` (skipped if a cluster exists), then `ncli cluster add-to-ntp-servers` / `add-to-name-servers` with `169.254.169.254`;
 5. final check and summary.
+
+Only one step 07 can run per node at a time (a lock in `state/`); two concurrent `cluster create` runs fail with `SVM ... is already configured`.
 
 Expected: `The state of the cluster: start`, 45 services `UP`, `ALL PASS` from the health check (chrony shows `Leap status: Normal` once the cluster pushed its NTP server to the host).
 
