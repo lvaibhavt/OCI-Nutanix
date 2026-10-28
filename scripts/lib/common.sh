@@ -116,10 +116,14 @@ clear_done(){ rm -f "$STATE_DIR/$NODE_NAME.$1.done"; }
 # hardened sshd closes the connection after a few failures ("Too many
 # authentication failures") before sshpass ever sees the password prompt.
 SSHO="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=10
+      -o ServerAliveInterval=15 -o ServerAliveCountMax=4
       -o PubkeyAuthentication=no -o PreferredAuthentications=password,keyboard-interactive
       -o NumberOfPasswordPrompts=1 -o GSSAPIAuthentication=no"
 SSHO=$(echo $SSHO)
-ssh_pw()  { sshpass -p "$CE_PASSWORD" ssh $SSHO "$@"; }
+# SSH_TIMEOUT (seconds, 0 = none) caps one call; wait_for sets it for its
+# probes, so a CVM that accepts SSH but never answers cannot hang a wait.
+# GNU timeout signals its whole process group: sshpass and ssh both end.
+ssh_pw()  { timeout "${SSH_TIMEOUT:-0}" sshpass -p "$CE_PASSWORD" ssh $SSHO "$@"; }
 # AHV has no SFTP server, so scp needs the legacy protocol (-O)
 scp_pw()  { sshpass -p "$CE_PASSWORD" scp -O $SSHO "$@"; }
 ssh_installer() { ssh_pw "root@$IBFT_IP" "$@"; }
@@ -137,7 +141,7 @@ scp_to_host()      { scp_pw "$@" "root@$HOST_IP:/root/"; }
 wait_for() {
   local label=$1 timeout=$2 iv=$3 t=0 n=0 err
   shift 3
-  until err=$("$@" 2>&1 >/dev/null); do
+  until err=$(SSH_TIMEOUT=${WAIT_PROBE_TIMEOUT:-60} "$@" 2>&1 >/dev/null); do
     n=$((n + 1))
     [ "$t" -ge "$timeout" ] && { echo; [ -n "$err" ] && echo "    last error: $(tail -1 <<< "$err")"; die "timed out after ${timeout}s waiting for $label"; }
     [ $((n % 4)) -eq 0 ] && [ -n "$err" ] && printf '\n    last error: %s\n' "$(tail -1 <<< "$err")"
