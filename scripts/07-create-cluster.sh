@@ -58,6 +58,16 @@ fi
 
 say "3/5 Waiting for the CVM $CVM_IP"
 wait_for "CVM ping" 1800 20 ping -c1 -W2 "$CVM_IP"
+# The CVM's first boot (nutanix-rc-local -> config_home_dir) takes the lock
+# /tmp/upgrade_genesis_venv.lock; "genesis status" takes the same lock. Run
+# too early, genesis status grabs it first, hangs, and first boot waits for it
+# forever (genesis never starts). So: wait for first boot to end, then ask.
+firstboot_done() {
+  local st
+  st=$(ssh_pw "nutanix@$CVM_IP" 'systemctl show -p ActiveState --value nutanix-rc-local') || return 1
+  [ -n "$st" ] && [ "$st" != activating ] || { echo "nutanix-rc-local: ${st:-unknown}"; return 1; }
+}
+wait_for "CVM first boot (nutanix-rc-local)" 3600 30 firstboot_done
 genesis_up() { ssh_cvm 'genesis status' | grep -q 'genesis:'; }
 wait_for "genesis on the CVM" 1800 30 genesis_up
 
