@@ -16,6 +16,6 @@ T=${1:-}; shift || true
 case $T in
   installer) exec sshpass -p "$CE_PASSWORD" ssh -t $SSHO "root@$IBFT_IP" "$@" ;;
   host)      exec sshpass -p "$CE_PASSWORD" ssh -t $SSHO "root@$HOST_IP" "$@" ;;
-  cvm)       if [ $# -gt 0 ]; then exec ssh_cvm_tty "$@"; else exec sshpass -p "$CE_PASSWORD" ssh -t $SSHO "nutanix@$CVM_IP"; fi ;;
+  cvm)       if [ $# -gt 0 ]; then ssh_cvm_tty "$@"; exit; else exec sshpass -p "$CE_PASSWORD" ssh -t $SSHO "nutanix@$CVM_IP"; fi ;;
   *) sed -n '2,9p' "$0"; exit 1 ;;
 esac
